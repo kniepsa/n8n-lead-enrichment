@@ -42,9 +42,9 @@ export default function ProgressTracker({ jobId, onComplete, onError }: Progress
 
   if (!progress) {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-12 text-center">
-        <div className="animate-spin h-8 w-8 border-4 border-accent-primary border-t-transparent rounded-full mx-auto" />
-        <p className="text-text-secondary mt-4">Initializing...</p>
+      <div className="max-w-3xl mx-auto px-6 py-16 md:py-24 text-center animate-fade-in">
+        <div className="animate-spin h-12 w-12 border-4 border-accent-primary border-t-transparent rounded-full mx-auto" />
+        <p className="text-text-secondary text-lg mt-6">Initializing...</p>
       </div>
     )
   }
@@ -57,49 +57,49 @@ export default function ProgressTracker({ jobId, onComplete, onError }: Progress
   ]
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-12">
-      <div className="bg-background-card border border-border rounded-lg p-8">
-        <h2 className="text-2xl font-bold text-text-primary mb-6 text-center">
+    <div className="max-w-3xl mx-auto px-6 py-16 md:py-24 animate-fade-in">
+      <div className="bg-background-card border border-border rounded-xl p-10 md:p-12 shadow-dark">
+        <h2 className="text-3xl md:text-4xl font-bold text-text-primary mb-10 text-center">
           Enriching Leads...
         </h2>
 
-        <div className="mb-8">
-          <div className="flex justify-between text-sm text-text-secondary mb-2">
+        <div className="mb-10">
+          <div className="flex justify-between text-base text-text-secondary mb-3 font-medium">
             <span>{progress.processed} / {progress.total}</span>
             <span>{progress.percentage}%</span>
           </div>
-          <div className="w-full bg-border rounded-full h-2">
+          <div className="w-full bg-border rounded-full h-3 overflow-hidden">
             <div
-              className="bg-accent-primary h-2 rounded-full transition-all duration-500"
+              className="bg-accent-primary h-3 rounded-full transition-all duration-500 shadow-glow"
               style={{ width: progress.percentage + '%' }}
             />
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           {steps.map((step, index) => {
             const isActive = progress.step === step.key
             const isComplete = steps.findIndex(s => s.key === progress.step) > index
-            
+
             return (
-              <div key={step.key} className="flex items-center gap-3">
-                <div className={'w-6 h-6 rounded-full flex items-center justify-center ' + (
-                  isComplete ? 'bg-accent-success' : 
-                  isActive ? 'bg-accent-primary animate-pulse' : 
+              <div key={step.key} className="flex items-center gap-4 transition-all duration-300">
+                <div className={'w-8 h-8 rounded-full flex items-center justify-center transition-all ' + (
+                  isComplete ? 'bg-accent-success shadow-glow' :
+                  isActive ? 'bg-accent-primary animate-pulse-slow shadow-glow-lg' :
                   'bg-border'
                 )}>
                   {isComplete && (
-                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
                 </div>
                 <div className="flex-1">
-                  <p className={isActive || isComplete ? 'text-text-primary' : 'text-text-muted'}>
+                  <p className={'font-medium text-base transition-colors ' + (isActive || isComplete ? 'text-text-primary' : 'text-text-muted')}>
                     {step.label}
                   </p>
                   {isActive && progress.processed > 0 && (
-                    <p className="text-text-secondary text-sm">
+                    <p className="text-text-secondary text-sm mt-1">
                       {progress.processed} / {progress.total} processed
                     </p>
                   )}
@@ -109,7 +109,7 @@ export default function ProgressTracker({ jobId, onComplete, onError }: Progress
           })}
         </div>
 
-        <p className="text-text-muted text-sm text-center mt-8">
+        <p className="text-text-muted text-base text-center mt-10">
           This usually takes 8-12 minutes. Feel free to close this tab - we'll email you when it's done.
         </p>
       </div>

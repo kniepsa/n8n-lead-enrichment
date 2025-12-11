@@ -64,13 +64,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-background-card border border-border rounded-lg max-w-2xl w-full p-8">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-text-primary">API Configuration</h2>
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
+      <div className="bg-background-card border border-border rounded-xl max-w-2xl w-full p-10 md:p-12 shadow-dark animate-slide-up">
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-text-primary">API Configuration</h2>
           <button
             onClick={onClose}
-            className="text-text-secondary hover:text-text-primary transition"
+            className="text-text-secondary hover:text-text-primary transition-colors p-2 hover:bg-background-input rounded-lg"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -78,9 +78,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div>
-            <label className="block text-text-secondary text-sm mb-2">
+            <label className="block text-text-secondary text-base mb-3 font-medium">
               MagicalAPI Key *
             </label>
             <div className="relative">
@@ -89,12 +89,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 value={keys.magicalApi}
                 onChange={(e) => setKeys({ ...keys, magicalApi: e.target.value })}
                 placeholder="magical_api_key_here"
-                className="w-full bg-background-input border border-border rounded-md px-4 py-2 text-text-primary focus:border-border-focus outline-none pr-12 font-mono text-sm"
+                className="w-full bg-background-input border border-border rounded-lg px-5 py-4 text-text-primary focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 outline-none pr-20 font-mono text-sm transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowKeys({ ...showKeys, magicalApi: !showKeys.magicalApi })}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-accent-primary text-sm font-medium transition-colors"
               >
                 {showKeys.magicalApi ? 'Hide' : 'Show'}
               </button>
@@ -102,7 +102,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
 
           <div>
-            <label className="block text-text-secondary text-sm mb-2">
+            <label className="block text-text-secondary text-base mb-3 font-medium">
               Prospeo API Key *
             </label>
             <div className="relative">
@@ -111,12 +111,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 value={keys.prospeo}
                 onChange={(e) => setKeys({ ...keys, prospeo: e.target.value })}
                 placeholder="prospeo_api_key_here"
-                className="w-full bg-background-input border border-border rounded-md px-4 py-2 text-text-primary focus:border-border-focus outline-none pr-12 font-mono text-sm"
+                className="w-full bg-background-input border border-border rounded-lg px-5 py-4 text-text-primary focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 outline-none pr-20 font-mono text-sm transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowKeys({ ...showKeys, prospeo: !showKeys.prospeo })}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-accent-primary text-sm font-medium transition-colors"
               >
                 {showKeys.prospeo ? 'Hide' : 'Show'}
               </button>
@@ -124,7 +124,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
 
           <div>
-            <label className="block text-text-secondary text-sm mb-2">
+            <label className="block text-text-secondary text-base mb-3 font-medium">
               Reoon API Key *
             </label>
             <div className="relative">
@@ -133,12 +133,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 value={keys.reoon}
                 onChange={(e) => setKeys({ ...keys, reoon: e.target.value })}
                 placeholder="reoon_api_key_here"
-                className="w-full bg-background-input border border-border rounded-md px-4 py-2 text-text-primary focus:border-border-focus outline-none pr-12 font-mono text-sm"
+                className="w-full bg-background-input border border-border rounded-lg px-5 py-4 text-text-primary focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 outline-none pr-20 font-mono text-sm transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowKeys({ ...showKeys, reoon: !showKeys.reoon })}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-accent-primary text-sm font-medium transition-colors"
               >
                 {showKeys.reoon ? 'Hide' : 'Show'}
               </button>
@@ -146,7 +146,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
 
           <div>
-            <label className="block text-text-secondary text-sm mb-2">
+            <label className="block text-text-secondary text-base mb-3 font-medium">
               Apollo API Key (optional)
             </label>
             <div className="relative">
@@ -155,39 +155,39 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 value={keys.apollo || ''}
                 onChange={(e) => setKeys({ ...keys, apollo: e.target.value })}
                 placeholder="apollo_api_key_here"
-                className="w-full bg-background-input border border-border rounded-md px-4 py-2 text-text-primary focus:border-border-focus outline-none pr-12 font-mono text-sm"
+                className="w-full bg-background-input border border-border rounded-lg px-5 py-4 text-text-primary focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 outline-none pr-20 font-mono text-sm transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowKeys({ ...showKeys, apollo: !showKeys.apollo })}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-accent-primary text-sm font-medium transition-colors"
               >
                 {showKeys.apollo ? 'Hide' : 'Show'}
               </button>
             </div>
-            <p className="text-text-muted text-xs mt-1">
+            <p className="text-text-muted text-sm mt-2">
               Only needed if using free Apollo tier API access
             </p>
           </div>
         </div>
 
-        <div className="flex gap-3 mt-8">
+        <div className="flex gap-4 mt-10">
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 bg-accent-primary text-white px-6 py-3 rounded-md hover:opacity-90 transition font-medium disabled:opacity-50"
+            className="flex-1 bg-accent-primary text-white px-8 py-4 rounded-lg hover:shadow-glow-lg hover:scale-[1.02] transition-all duration-200 font-semibold text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             {saving ? 'Saving...' : 'Save Keys'}
           </button>
           <button
             onClick={handleClear}
-            className="border border-border text-text-primary px-6 py-3 rounded-md hover:bg-background-input transition"
+            className="border border-border text-text-primary px-8 py-4 rounded-lg hover:border-accent-error/50 hover:bg-background-input transition-all duration-200 font-semibold text-base"
           >
             Clear All
           </button>
         </div>
 
-        <p className="text-text-muted text-xs mt-4 text-center">
+        <p className="text-text-muted text-sm mt-6 text-center leading-relaxed">
           Keys are encrypted and stored locally in your browser. We never send them to our servers.
         </p>
       </div>
