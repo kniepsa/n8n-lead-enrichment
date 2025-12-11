@@ -1,6 +1,28 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-background: #000000;
+  --color-background-card: #0A0A0A;
+  --color-background-input: #111111;
+
+  --color-border: #1A1A1A;
+  --color-border-focus: #333333;
+
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #888888;
+  --color-text-muted: #666666;
+
+  --color-accent-primary: #5E5CE6;
+  --color-accent-success: #34D399;
+  --color-accent-error: #EF4444;
+
+  --font-family-sans: 'Inter', system-ui, sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'Courier New', 'monospace';
+
+  --shadow-glow: 0 0 20px rgba(94, 92, 230, 0.15);
+  --shadow-glow-lg: 0 0 30px rgba(94, 92, 230, 0.25);
+  --shadow-dark: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
 
 :root {
   --font-inter: 'Inter', system-ui, sans-serif;
@@ -58,4 +80,23 @@ a {
 *:focus-visible {
   outline: 2px solid #5E5CE6;
   outline-offset: 2px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slideUp {
+  0% { transform: translateY(20px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* Gradient utilities */
+.gradient-text {
+  background: linear-gradient(135deg, #5E5CE6 0%, #34D399 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
