@@ -1,0 +1,106 @@
+{
+  "timestamp": "2025-12-12T12:29:56.087Z",
+  "workflowName": "Lead Enrichment Pipeline - Rebuilt",
+  "nodeCount": 18,
+  "expectedNodeCount": 18,
+  "allNodesPresent": true,
+  "issues": [],
+  "status": "PASS",
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2
+    },
+    {
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3
+    },
+    {
+      "name": "IF Source Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "name": "Parse LinkedIn URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3
+    },
+    {
+      "name": "MagicalAPI Enrichment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "name": "Extract Profile Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3
+    },
+    {
+      "name": "Prospeo Email Finder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "name": "Extract Email Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3
+    },
+    {
+      "name": "IF Email Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "name": "Reoon Verification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "name": "Extract Verification Status",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3
+    },
+    {
+      "name": "Set No Email Status",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3
+    },
+    {
+      "name": "Merge Email Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3
+    },
+    {
+      "name": "Progress Update",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "name": "Aggregate All Results",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1
+    },
+    {
+      "name": "Generate CSV & Stats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "name": "Completion Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    }
+  ]
+}

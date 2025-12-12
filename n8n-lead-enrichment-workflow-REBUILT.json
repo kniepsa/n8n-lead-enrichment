@@ -1,0 +1,586 @@
+{
+  "name": "Lead Enrichment Pipeline - Rebuilt",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "lead-enrichment",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "lead-enrichment"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "jobId",
+              "value": "={{ $json.body.jobId }}",
+              "type": "string"
+            },
+            {
+              "name": "source",
+              "value": "={{ $json.body.source }}",
+              "type": "string"
+            },
+            {
+              "name": "data",
+              "value": "={{ $json.body.data }}",
+              "type": "string"
+            },
+            {
+              "name": "apiKeys",
+              "value": "={{ $json.body.apiKeys }}",
+              "type": "string"
+            },
+            {
+              "name": "useFreeCredit",
+              "value": "={{ $json.body.useFreeCredit }}",
+              "type": "boolean"
+            },
+            {
+              "name": "progressUrl",
+              "value": "={{ $json.body.progressUrl }}",
+              "type": "string"
+            },
+            {
+              "name": "completeUrl",
+              "value": "={{ $json.body.completeUrl }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.source }}",
+              "operation": "equals",
+              "value2": "linkedin_urls"
+            }
+          ]
+        }
+      },
+      "name": "IF Source Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get input data\nconst data = $input.first().json.data;\nconst apiKeys = $input.first().json.apiKeys;\n\n// Parse apiKeys if string\nlet parsedKeys = apiKeys;\nif (typeof apiKeys === 'string') {\n  try {\n    parsedKeys = JSON.parse(apiKeys);\n  } catch (e) {\n    throw new Error('Invalid apiKeys format: ' + e.message);\n  }\n}\n\n// Parse LinkedIn URLs\nlet urls = [];\nif (typeof data === 'string') {\n  if (data.trim().startsWith('[')) {\n    try {\n      urls = JSON.parse(data);\n    } catch {\n      urls = data.split(/[\\n,]+/).map(u => u.trim()).filter(Boolean);\n    }\n  } else {\n    urls = data.split(/[\\n,]+/).map(u => u.trim()).filter(Boolean);\n  }\n} else if (Array.isArray(data)) {\n  urls = data;\n} else {\n  urls = [String(data)];\n}\n\n// Remove duplicates\nconst uniqueUrls = [...new Set(urls)];\n\n// Return single item with all data\nreturn {\n  linkedInUrls: uniqueUrls,\n  totalUrls: uniqueUrls.length,\n  jobId: $input.first().json.jobId,\n  apiKeys: parsedKeys,\n  progressUrl: $input.first().json.progressUrl,\n  completeUrl: $input.first().json.completeUrl\n};"
+      },
+      "name": "Parse LinkedIn URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "linkedInUrls",
+        "options": {
+          "batchSize": 1
+        }
+      },
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.magicalapi.com/v1/profile/linkedin",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Parse LinkedIn URLs').item.json.apiKeys.magicalApi }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"profile_url\": $json.linkedInUrls } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "MagicalAPI Enrichment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "linkedin_url",
+              "value": "={{ $json.profile_url || $('Split In Batches').item.json.linkedInUrls }}",
+              "type": "string"
+            },
+            {
+              "name": "first_name",
+              "value": "={{ $json.first_name || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "last_name",
+              "value": "={{ $json.last_name || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "company",
+              "value": "={{ $json.company?.name || $json.company || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "title",
+              "value": "={{ $json.headline || $json.title || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "location",
+              "value": "={{ $json.location || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "jobId",
+              "value": "={{ $('Parse LinkedIn URLs').item.json.jobId }}",
+              "type": "string"
+            },
+            {
+              "name": "apiKeys",
+              "value": "={{ $('Parse LinkedIn URLs').item.json.apiKeys }}",
+              "type": "object"
+            },
+            {
+              "name": "progressUrl",
+              "value": "={{ $('Parse LinkedIn URLs').item.json.progressUrl }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Extract Profile Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [1560, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.prospeo.io/linkedin-email-finder?url={{ encodeURIComponent($json.linkedin_url) }}&api_key={{ $json.apiKeys.prospeo }}",
+        "authentication": "none",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Prospeo Email Finder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "email",
+              "value": "={{ $json.response?.email || $json.email || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "email_status",
+              "value": "={{ $json.response?.email || $json.email ? 'found' : 'not_found' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "name": "Extract Email Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [2000, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.email }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "IF Email Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2220, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://emailverifier.reoon.com/api/v1/verify?email={{ encodeURIComponent($json.email) }}&key={{ $json.apiKeys.reoon }}&mode=quick",
+        "authentication": "none",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Reoon Verification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2440, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "verification_status",
+              "value": "={{ $json.status || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "name": "is_deliverable",
+              "value": "={{ $json.status === 'safe' || $json.status === 'deliverable' }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "name": "Extract Verification Status",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [2660, 100]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "verification_status",
+              "value": "not_verified",
+              "type": "string"
+            },
+            {
+              "name": "is_deliverable",
+              "value": "=false",
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "name": "Set No Email Status",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [2440, 300]
+    },
+    {
+      "parameters": {},
+      "name": "Merge Email Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [2880, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.progressUrl }}",
+        "authentication": "none",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"jobId\": $json.jobId,\n  \"step\": \"email_verification\",\n  \"processed\": $runIndex + 1,\n  \"total\": $('Parse LinkedIn URLs').item.json.totalUrls\n} }}",
+        "options": {}
+      },
+      "name": "Progress Update",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3100, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "name": "Aggregate All Results",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [3320, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all items\nconst allItems = $input.all();\n\n// Calculate statistics\nconst stats = {\n  total: allItems.length,\n  deliverable: allItems.filter(i => i.json.is_deliverable === true).length,\n  invalid: allItems.filter(i => i.json.verification_status === 'invalid').length,\n  no_email: allItems.filter(i => i.json.email_status === 'not_found').length\n};\n\nstats.successRate = stats.total > 0 ? Math.round((stats.deliverable / stats.total) * 100) : 0;\n\n// Prepare CSV rows\nconst headers = ['First Name', 'Last Name', 'Title', 'Company', 'Email', 'LinkedIn URL', 'Location', 'Email Status', 'Verification', 'Deliverable'];\n\nconst rows = allItems\n  .filter(i => i.json.is_deliverable === true) // Only deliverable emails\n  .map(i => [\n    i.json.first_name || '',\n    i.json.last_name || '',\n    i.json.title || '',\n    i.json.company || '',\n    i.json.email || '',\n    i.json.linkedin_url || '',\n    i.json.location || '',\n    i.json.email_status || 'not_found',\n    i.json.verification_status || 'unknown',\n    i.json.is_deliverable ? 'Yes' : 'No'\n  ]);\n\n// Generate CSV content\nconst csvContent = [headers, ...rows]\n  .map(row => row.map(cell => `\"${String(cell).replace(/\"/g, '\"\"')}\"`).join(','))\n  .join('\\n');\n\n// Return single item with all data\nreturn {\n  stats,\n  csvContent,\n  jobId: allItems[0]?.json?.jobId || 'unknown',\n  completeUrl: allItems[0]?.json?.progressUrl?.replace('/progress', '/complete') || ''\n};"
+      },
+      "name": "Generate CSV & Stats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3540, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.completeUrl }}",
+        "authentication": "none",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"jobId\": $json.jobId,\n  \"downloadUrl\": \"data:text/csv;charset=utf-8,\" + encodeURIComponent($json.csvContent),\n  \"stats\": $json.stats\n} }}",
+        "options": {}
+      },
+      "name": "Completion Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3760, 200],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Variables": {
+      "main": [
+        [
+          {
+            "node": "IF Source Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Source Type": {
+      "main": [
+        [
+          {
+            "node": "Parse LinkedIn URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse LinkedIn URLs": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "MagicalAPI Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MagicalAPI Enrichment": {
+      "main": [
+        [
+          {
+            "node": "Extract Profile Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Profile Data": {
+      "main": [
+        [
+          {
+            "node": "Prospeo Email Finder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prospeo Email Finder": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email Data": {
+      "main": [
+        [
+          {
+            "node": "IF Email Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Email Found": {
+      "main": [
+        [
+          {
+            "node": "Reoon Verification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set No Email Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reoon Verification": {
+      "main": [
+        [
+          {
+            "node": "Extract Verification Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Verification Status": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set No Email Status": {
+      "main": [
+        [
+          {
+            "node": "Merge Email Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Email Results": {
+      "main": [
+        [
+          {
+            "node": "Progress Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Progress Update": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        null,
+        [
+          {
+            "node": "Aggregate All Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate All Results": {
+      "main": [
+        [
+          {
+            "node": "Generate CSV & Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate CSV & Stats": {
+      "main": [
+        [
+          {
+            "node": "Completion Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-12T00:00:00.000Z",
+  "versionId": "1"
+}

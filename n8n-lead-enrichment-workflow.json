@@ -1,0 +1,615 @@
+{
+  "name": "Lead Enrichment Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "lead-enrichment",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "lead-enrichment"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "jobId",
+              "value": "={{ $json.body.jobId }}"
+            },
+            {
+              "name": "source",
+              "value": "={{ $json.body.source }}"
+            },
+            {
+              "name": "data",
+              "value": "={{ $json.body.data }}"
+            },
+            {
+              "name": "apiKeys",
+              "value": "={{ JSON.stringify($json.body.apiKeys) }}"
+            },
+            {
+              "name": "email",
+              "value": "={{ $json.body.email || '' }}"
+            },
+            {
+              "name": "useFreeCredit",
+              "value": "={{ $json.body.useFreeCredit }}"
+            },
+            {
+              "name": "progressUrl",
+              "value": "={{ $env.NEXTJS_BASE_URL }}/api/enrich/progress"
+            },
+            {
+              "name": "completeUrl",
+              "value": "={{ $env.NEXTJS_BASE_URL }}/api/enrich/complete"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.source }}",
+              "value2": "apollo_url"
+            }
+          ]
+        }
+      },
+      "name": "IF Source Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse LinkedIn URLs from direct input\nconst data = $input.item.json.data;\nlet linkedInUrls = [];\n\nif (typeof data === 'string') {\n  try {\n    linkedInUrls = JSON.parse(data);\n  } catch {\n    linkedInUrls = data.split('\\n').filter(url => url.trim());\n  }\n} else if (Array.isArray(data)) {\n  linkedInUrls = data;\n}\n\nreturn [\n  {\n    json: {\n      linkedInUrls,\n      totalUrls: linkedInUrls.length,\n      jobId: $input.item.json.jobId,\n      apiKeys: JSON.parse($input.item.json.apiKeys),\n      progressUrl: $input.item.json.progressUrl,\n      completeUrl: $input.item.json.completeUrl\n    }\n  }\n];"
+      },
+      "name": "Parse LinkedIn URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex"
+      },
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare batch of LinkedIn URLs for MagicalAPI\nconst linkedInUrls = $node['Merge'].json.linkedInUrls;\nconst batchIndex = $node['Split In Batches'].context.currentRunIndex;\nconst batchSize = 5;\nconst start = batchIndex * batchSize;\nconst end = Math.min(start + batchSize, linkedInUrls.length);\nconst batch = linkedInUrls.slice(start, end);\n\nreturn batch.map(url => ({\n  json: {\n    linkedin_url: url,\n    jobId: $node['Merge'].json.jobId,\n    apiKeys: $node['Merge'].json.apiKeys,\n    progressUrl: $node['Merge'].json.progressUrl,\n    completeUrl: $node['Merge'].json.completeUrl,\n    totalUrls: linkedInUrls.length,\n    batchIndex,\n    processed: start\n  }\n}));"
+      },
+      "name": "Prepare Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.magicalapi.com/v1/profile/linkedin",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.apiKeys.magicalApi }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "profile_url",
+              "value": "={{ $json.linkedin_url }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "name": "MagicalAPI Enrichment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1650, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract profile data from MagicalAPI response\nconst items = $input.all();\nconst enrichedProfiles = [];\n\nitems.forEach(item => {\n  if (item.error) {\n    enrichedProfiles.push({\n      linkedin_url: item.json.linkedin_url,\n      error: 'MagicalAPI enrichment failed',\n      first_name: null,\n      last_name: null,\n      company: null,\n      title: null,\n      jobId: item.json.jobId,\n      apiKeys: item.json.apiKeys,\n      progressUrl: item.json.progressUrl,\n      completeUrl: item.json.completeUrl,\n      totalUrls: item.json.totalUrls\n    });\n  } else {\n    const profile = item.json;\n    enrichedProfiles.push({\n      linkedin_url: profile.profile_url || item.json.linkedin_url,\n      first_name: profile.first_name || profile.firstName,\n      last_name: profile.last_name || profile.lastName,\n      company: profile.company?.name || profile.company,\n      title: profile.headline || profile.title,\n      location: profile.location,\n      jobId: item.json.jobId,\n      apiKeys: item.json.apiKeys,\n      progressUrl: item.json.progressUrl,\n      completeUrl: item.json.completeUrl,\n      totalUrls: item.json.totalUrls,\n      batchIndex: item.json.batchIndex,\n      processed: item.json.processed\n    });\n  }\n});\n\nreturn enrichedProfiles.map(p => ({ json: p }));"
+      },
+      "name": "Extract Profile Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.progressUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "jobId",
+              "value": "={{ $json.jobId }}"
+            },
+            {
+              "name": "step",
+              "value": "magical_enrichment"
+            },
+            {
+              "name": "processed",
+              "value": "={{ $json.processed + $input.all().length }}"
+            },
+            {
+              "name": "total",
+              "value": "={{ $json.totalUrls }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Progress Update - MagicalAPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [2050, 300],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "name": "Split In Batches - Prospeo",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [2250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.prospeo.io/email-finder",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-KEY",
+              "value": "={{ $json.apiKeys.prospeo }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "first_name",
+              "value": "={{ $json.first_name }}"
+            },
+            {
+              "name": "last_name",
+              "value": "={{ $json.last_name }}"
+            },
+            {
+              "name": "domain",
+              "value": "={{ $json.company }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 12000
+        }
+      },
+      "name": "Prospeo Email Finder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [2450, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Merge email data with profile data\nconst items = $input.all();\nconst profilesWithEmail = [];\n\nitems.forEach(item => {\n  const profile = { ...item.json };\n  \n  if (item.error || !item.json.email) {\n    profile.email = null;\n    profile.email_status = 'not_found';\n  } else {\n    profile.email = item.json.email;\n    profile.email_status = item.json.status || 'found';\n  }\n  \n  profilesWithEmail.push(profile);\n});\n\nreturn profilesWithEmail.map(p => ({ json: p }));"
+      },
+      "name": "Extract Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [2650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.progressUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "jobId",
+              "value": "={{ $json.jobId }}"
+            },
+            {
+              "name": "step",
+              "value": "prospeo_enrichment"
+            },
+            {
+              "name": "processed",
+              "value": "={{ $node['Split In Batches - Prospeo'].context.currentRunIndex * 10 + $input.all().length }}"
+            },
+            {
+              "name": "total",
+              "value": "={{ $json.totalUrls }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Progress Update - Prospeo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [2850, 300],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.email }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "Filter Non-Empty Emails",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 1,
+      "position": [3050, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "name": "Split In Batches - Reoon",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [3250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.reoon.com/v1/verify?email={{ encodeURIComponent($json.email) }}&api_key={{ $json.apiKeys.reoon }}&mode=POWER",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Reoon Verification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [3450, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract verification status\nconst items = $input.all();\nconst verifiedProfiles = [];\n\nitems.forEach(item => {\n  const profile = { ...item.json };\n  \n  if (item.error) {\n    profile.verification_status = 'unknown';\n    profile.is_deliverable = false;\n  } else {\n    const status = item.json.status?.toLowerCase();\n    \n    if (status === 'valid' || status === 'deliverable') {\n      profile.verification_status = 'deliverable';\n      profile.is_deliverable = true;\n    } else if (status === 'risky') {\n      profile.verification_status = 'risky';\n      profile.is_deliverable = false;\n    } else {\n      profile.verification_status = 'invalid';\n      profile.is_deliverable = false;\n    }\n  }\n  \n  verifiedProfiles.push(profile);\n});\n\nreturn verifiedProfiles.map(p => ({ json: p }));"
+      },
+      "name": "Extract Verification Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [3650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.progressUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "jobId",
+              "value": "={{ $json.jobId }}"
+            },
+            {
+              "name": "step",
+              "value": "reoon_verification"
+            },
+            {
+              "name": "processed",
+              "value": "={{ $node['Split In Batches - Reoon'].context.currentRunIndex * 10 + $input.all().length }}"
+            },
+            {
+              "name": "total",
+              "value": "={{ $json.totalUrls }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Progress Update - Reoon",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [3850, 300],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "all_profiles"
+      },
+      "name": "Aggregate All",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [4050, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.is_deliverable }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Filter Deliverable Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 1,
+      "position": [4250, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Calculate statistics\nconst items = $input.all();\nconst deliverable = items.filter(p => p.json.is_deliverable);\nconst allItems = items.length;\n\n// Get all profiles including non-deliverable from previous node\nconst allProfiles = $node['Aggregate All'].json.all_profiles || [];\nconst invalid = allProfiles.filter(p => !p.is_deliverable && p.email).length;\nconst noEmail = allProfiles.filter(p => !p.email).length;\n\nconst stats = {\n  total: allProfiles.length,\n  deliverable: deliverable.length,\n  invalid: invalid,\n  no_email: noEmail,\n  successRate: allProfiles.length > 0 \n    ? Math.round((deliverable.length / allProfiles.length) * 100) \n    : 0\n};\n\nreturn [{\n  json: {\n    profiles: deliverable.map(p => p.json),\n    stats,\n    jobId: items[0]?.json?.jobId,\n    completeUrl: items[0]?.json?.completeUrl\n  }\n}];"
+      },
+      "name": "Calculate Statistics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [4450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.progressUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "jobId",
+              "value": "={{ $json.jobId }}"
+            },
+            {
+              "name": "step",
+              "value": "filtering"
+            },
+            {
+              "name": "processed",
+              "value": "={{ $json.stats.deliverable }}"
+            },
+            {
+              "name": "total",
+              "value": "={{ $json.stats.total }}"
+            },
+            {
+              "name": "percentage",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Progress Update - Filtering",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [4650, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Generate CSV\nconst profiles = $json.profiles;\n\nconst headers = ['Name', 'Title', 'Company', 'Email', 'LinkedIn URL', 'Location'];\nconst rows = profiles.map(p => [\n  `${p.first_name || ''} ${p.last_name || ''}`.trim(),\n  p.title || '',\n  p.company || '',\n  p.email || '',\n  p.linkedin_url || '',\n  p.location || ''\n]);\n\nconst csvContent = [\n  headers.join(','),\n  ...rows.map(row => row.map(cell => `\"${cell}\"`).join(','))\n].join('\\n');\n\nreturn [{\n  json: {\n    csvContent,\n    csvBase64: Buffer.from(csvContent).toString('base64'),\n    fileName: `leads_${$json.jobId}.csv`,\n    stats: $json.stats,\n    jobId: $json.jobId,\n    completeUrl: $json.completeUrl\n  }\n}];"
+      },
+      "name": "Generate CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [4850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.completeUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "jobId",
+              "value": "={{ $json.jobId }}"
+            },
+            {
+              "name": "downloadUrl",
+              "value": "=data:text/csv;base64,{{ $json.csvBase64 }}"
+            },
+            {
+              "name": "stats",
+              "value": "={{ JSON.stringify($json.stats) }}"
+            }
+          ]
+        },
+        "options": {
+          "retry": {
+            "maxTries": 3
+          }
+        }
+      },
+      "name": "Completion Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [5050, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Set Variables", "type": "main", "index": 0 }]]
+    },
+    "Set Variables": {
+      "main": [[{ "node": "IF Source Type", "type": "main", "index": 0 }]]
+    },
+    "IF Source Type": {
+      "main": [
+        [],
+        [{ "node": "Parse LinkedIn URLs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse LinkedIn URLs": {
+      "main": [[{ "node": "Merge", "type": "main", "index": 0 }]]
+    },
+    "Merge": {
+      "main": [[{ "node": "Split In Batches", "type": "main", "index": 0 }]]
+    },
+    "Split In Batches": {
+      "main": [[{ "node": "Prepare Batch", "type": "main", "index": 0 }]]
+    },
+    "Prepare Batch": {
+      "main": [[{ "node": "MagicalAPI Enrichment", "type": "main", "index": 0 }]]
+    },
+    "MagicalAPI Enrichment": {
+      "main": [[{ "node": "Extract Profile Data", "type": "main", "index": 0 }]]
+    },
+    "Extract Profile Data": {
+      "main": [[{ "node": "Progress Update - MagicalAPI", "type": "main", "index": 0 }]]
+    },
+    "Progress Update - MagicalAPI": {
+      "main": [[{ "node": "Split In Batches", "type": "main", "index": 0 }]]
+    },
+    "Split In Batches": {
+      "main": [[{ "node": "Split In Batches - Prospeo", "type": "main", "index": 0 }]]
+    },
+    "Split In Batches - Prospeo": {
+      "main": [[{ "node": "Prospeo Email Finder", "type": "main", "index": 0 }]]
+    },
+    "Prospeo Email Finder": {
+      "main": [[{ "node": "Extract Email Data", "type": "main", "index": 0 }]]
+    },
+    "Extract Email Data": {
+      "main": [[{ "node": "Progress Update - Prospeo", "type": "main", "index": 0 }]]
+    },
+    "Progress Update - Prospeo": {
+      "main": [[{ "node": "Split In Batches - Prospeo", "type": "main", "index": 0 }]]
+    },
+    "Split In Batches - Prospeo": {
+      "main": [[{ "node": "Filter Non-Empty Emails", "type": "main", "index": 0 }]]
+    },
+    "Filter Non-Empty Emails": {
+      "main": [[{ "node": "Split In Batches - Reoon", "type": "main", "index": 0 }]]
+    },
+    "Split In Batches - Reoon": {
+      "main": [[{ "node": "Reoon Verification", "type": "main", "index": 0 }]]
+    },
+    "Reoon Verification": {
+      "main": [[{ "node": "Extract Verification Status", "type": "main", "index": 0 }]]
+    },
+    "Extract Verification Status": {
+      "main": [[{ "node": "Progress Update - Reoon", "type": "main", "index": 0 }]]
+    },
+    "Progress Update - Reoon": {
+      "main": [[{ "node": "Split In Batches - Reoon", "type": "main", "index": 0 }]]
+    },
+    "Split In Batches - Reoon": {
+      "main": [[{ "node": "Aggregate All", "type": "main", "index": 0 }]]
+    },
+    "Aggregate All": {
+      "main": [[{ "node": "Filter Deliverable Only", "type": "main", "index": 0 }]]
+    },
+    "Filter Deliverable Only": {
+      "main": [[{ "node": "Calculate Statistics", "type": "main", "index": 0 }]]
+    },
+    "Calculate Statistics": {
+      "main": [[{ "node": "Progress Update - Filtering", "type": "main", "index": 0 }]]
+    },
+    "Progress Update - Filtering": {
+      "main": [[{ "node": "Generate CSV", "type": "main", "index": 0 }]]
+    },
+    "Generate CSV": {
+      "main": [[{ "node": "Completion Callback", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
